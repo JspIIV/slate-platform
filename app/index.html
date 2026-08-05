@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slate: funding rounds judged on GenLayer, paid in USDC</title>
+  </head>
+  <body>
+    <!-- Loaded before the app so a dev wallet, if the server offers one, is in
+         place by the time the app looks for window.ethereum. A server without
+         DEV_WALLET answers 404 and this does nothing. -->
+    <script src="/dev/wallet.js" onerror="void 0"></script>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
