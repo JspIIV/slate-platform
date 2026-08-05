@@ -163,9 +163,50 @@ One round, three addresses, two chains, real USDC.
 | The declined applicant took his deposit back | 1 USDC, and nothing else |
 | Nothing was stranded | The escrow's balance ended at `0` |
 
+A second round was run the same way after the registry was wired to receive
+results, and the catalogue now shows it settled: `status=JUDGED funded=1
+allocated=6000000`, written by the round contract itself through a contract to
+contract call.
+
 The reasoning is on chain too: *"The cited page is a Wikipedia article about the
 category of static site generators, not a demonstration of the applicant's own
 working tool."*
+
+## Driven through the app
+
+The lifecycle above was run headless. The same flow was then driven through the
+web app itself, and doing so found four things a script never would:
+
+* The sponsor had no way to fund a round. The round page offered applications
+  and settlement but not the one step without which nothing else can happen.
+* An approval and the call that spends it were sent back to back, and the second
+  failed with `missing revert data`, which mentions neither approvals nor
+  allowances. The allowance is now read back before anything tries to spend it.
+* Reading the escrow did not switch the network first, so a wallet left on
+  GenLayer after signing an application made the page unable to tell whether a
+  round was funded. Buttons then quietly disappeared, which is worse than an
+  error.
+* Applying touches both chains, so it can be interrupted in the middle and leave
+  a deposit staked with no application behind it. The second attempt used to ask
+  for a second deposit; it now recognises the stake already held and carries on.
+
+There is also a runtime quirk worth recording. Waiting for a GenLayer receipt
+through a wallet provider reaches the consensus contract with a plain `eth_call`,
+which answers with nothing on this network, so an accepted transaction reads as
+a failure. The app therefore confirms a write by reading the contract back until
+it shows the change, which is what a person wanted to know anyway.
+
+At the time of writing the network is not finalising GenLayer transactions:
+applications submitted through the app sit at `PENDING` with `NOT_VOTED`, and
+GenLayer's own status note says a stall began at about 02:10 UTC on 5 August.
+Nothing is lost while that lasts, which is the point of the grace period: the
+deposits and the pot are on Base and come back to whoever put them up if the
+verdict never arrives. The scripted runs above were completed before it began.
+
+`DEV_WALLET=1` serves a wallet that signs with the project's own test keys, so
+the app can be driven where no browser extension exists. It is not a mock: the
+app takes its ordinary path and every transaction is real. It is served only
+when that variable is set.
 
 ## Running it
 
