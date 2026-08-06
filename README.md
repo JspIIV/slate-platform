@@ -190,18 +190,37 @@ web app itself, and doing so found four things a script never would:
   a deposit staked with no application behind it. The second attempt used to ask
   for a second deposit; it now recognises the stake already held and carries on.
 
-There is also a runtime quirk worth recording. Waiting for a GenLayer receipt
-through a wallet provider reaches the consensus contract with a plain `eth_call`,
-which answers with nothing on this network, so an accepted transaction reads as
-a failure. The app therefore confirms a write by reading the contract back until
-it shows the change, which is what a person wanted to know anyway.
+One of those attempts kept failing in a way that looked like the network and was
+not. The app was on `genlayer-js@0.14.2` while the scripts were on `1.1.8`, and
+the two send to different consensus contracts. Transactions to the older address
+are accepted by the node and then sit at `NOT_VOTED` forever: no error, no
+revert, nothing on the contract, while an identical scripted write landed in
+about thirteen seconds. Reads through the old version fail differently again,
+with `getTransactionData returned no data`, which reads like an outage. Pinning
+both to the same version fixed every symptom at once.
 
-At the time of writing the network is not finalising GenLayer transactions:
-applications submitted through the app sit at `PENDING` with `NOT_VOTED`, and
-GenLayer's own status note says a stall began at about 02:10 UTC on 5 August.
-Nothing is lost while that lasts, which is the point of the grace period: the
-deposits and the pot are on Base and come back to whoever put them up if the
-verdict never arrives. The scripted runs above were completed before it began.
+The app still confirms a write by reading the contract back rather than by
+waiting on a receipt. That is a person's actual question, and it does not depend
+on which contract a version happens to know about.
+
+The whole flow was then driven through the app on Asimov: a round opened across
+both chains, the pot funded, an application staked on Base and recorded on
+GenLayer, judging run from the round page, the verdict relayed to the escrow, and
+the award and the deposit both claimed. The escrow ended at zero.
+
+**A note on which network this is.** Everything here is on Asimov, reached
+through `rpc-asimov.genlayer.com`. Asimov and Bradbury report the same chain id,
+the same block height and the same native balances, but they are separate
+networks: a contract deployed through one answers `contract not found` on the
+other. Bradbury was not finalising transactions while this was built, and Asimov
+was accepting them in about thirteen seconds.
+
+The escape hatch was exercised for real rather than in theory. Three rounds were
+left funded when transactions stopped landing, and after the grace period every
+one of them was emptied by the people owed the money: the applicants took their
+deposits, the sponsor took the pots back, and each escrow ended at zero. None of
+that needed the relayer, the bridge, or GenLayer to be healthy, which is the
+point of keeping the money on the other chain.
 
 `DEV_WALLET=1` serves a wallet that signs with the project's own test keys, so
 the app can be driven where no browser extension exists. It is not a mock: the

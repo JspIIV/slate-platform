@@ -53,6 +53,9 @@ export async function handle(who, { method, params, chainId: requestChain }) {
     const tx = { ...(params?.[0] || {}) };
     const rpc = chainOf(tx.chainId || requestChain);
 
+    if (process.env.DEV_WALLET_TRACE === '1') {
+      console.log('dev wallet: raw tx', JSON.stringify(tx));
+    }
     const provider = new JsonRpcProvider(rpc);
     const signer = wallet.connect(provider);
 

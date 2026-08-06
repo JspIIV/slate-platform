@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "ethers": "^6.13.0",
-    "genlayer-js": "^0.14.0"
+    "genlayer-js": "^1.1.8"
   },
   "devDependencies": {
     "vite": "^7.0.0"
