@@ -24,9 +24,8 @@
 import express from 'express';
 import cors from 'cors';
 import { Wallet, JsonRpcProvider, Contract, ContractFactory, parseUnits } from 'ethers';
-import { createClient, createAccount } from '../colophon-app/node_modules/genlayer-js/dist/index.js';
-import { testnetAsimov } from '../colophon-app/node_modules/genlayer-js/dist/chains/index.js';
-import { Wallet as GenWallet } from 'file:///C:/Users/ysfym/AppData/Roaming/npm/node_modules/genlayer/node_modules/ethers/lib.esm/index.js';
+import { createClient, createAccount } from 'genlayer-js';
+import { testnetAsimov } from 'genlayer-js/chains';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -41,11 +40,15 @@ const REGISTRY = process.env.REGISTRY;
 const BRIDGE = process.env.BRIDGE;
 const GRACE_SECONDS = Number(process.env.GRACE_SECONDS || 1800);
 
+// The deployer key comes either from a file on a developer's machine or, when
+// hosted, from an environment variable holding the same encrypted keystore. It
+// is never in the repository either way.
 const KEYSTORE = process.env.KEYSTORE;
+const KEYSTORE_JSON = process.env.KEYSTORE_JSON;
 const KEY_PASS = process.env.KEY_PASS;
 
-if (!REGISTRY || !BRIDGE || !KEYSTORE) {
-  console.error('REGISTRY, BRIDGE and KEYSTORE are required');
+if (!REGISTRY || !BRIDGE || (!KEYSTORE && !KEYSTORE_JSON)) {
+  console.error('REGISTRY, BRIDGE and either KEYSTORE or KEYSTORE_JSON are required');
   process.exit(1);
 }
 
@@ -53,10 +56,9 @@ const artifact = JSON.parse(fs.readFileSync(path.join(__dirname, 'build/SlateEsc
 const roundSource = fs.readFileSync(path.join(__dirname, 'contracts/slate_round.py'));
 
 const provider = new JsonRpcProvider(BASE_RPC);
-const keystoreJson = fs.readFileSync(KEYSTORE, 'utf8');
+const keystoreJson = KEYSTORE_JSON || fs.readFileSync(KEYSTORE, 'utf8');
 const deployer = (await Wallet.fromEncryptedJson(keystoreJson, KEY_PASS)).connect(provider);
-const genWallet = await GenWallet.fromEncryptedJson(keystoreJson, KEY_PASS);
-const gen = createClient({ chain: testnetAsimov, account: createAccount(genWallet.privateKey) });
+const gen = createClient({ chain: testnetAsimov, account: createAccount(deployer.privateKey) });
 const genReader = createClient({ chain: testnetAsimov });
 
 const ZERO_HASH = '0x' + '0'.repeat(64);
@@ -115,10 +117,31 @@ app.get('/api/config', (_req, res) => {
   });
 });
 
+// Opening a round costs this server gas on two chains, so a public instance
+// needs a limit that a laptop does not. It is deliberately crude: enough to
+// stop a loop from draining the deployer, not enough to get in a visitor's way.
+const OPEN_LIMIT_PER_HOUR = Number(process.env.OPEN_LIMIT_PER_HOUR || 6);
+const opened = [];
+
+function withinLimit() {
+  const hourAgo = Date.now() - 3600_000;
+  while (opened.length && opened[0] < hourAgo) opened.shift();
+  if (opened.length >= OPEN_LIMIT_PER_HOUR) return false;
+  opened.push(Date.now());
+  return true;
+}
+
 /// Opens a round: an escrow on Base, a round on GenLayer, and the link between
 /// them. The sponsor funds it afterwards from their own wallet.
 app.post('/api/rounds', async (req, res) => {
   try {
+    if (!withinLimit()) {
+      return res.status(429).json({
+        error: `This instance opens at most ${OPEN_LIMIT_PER_HOUR} rounds an hour, `
+          + 'because each one costs it gas on two testnets. Try again shortly, '
+          + 'or run your own copy from the repository.',
+      });
+    }
     const { sponsor, title, purpose, criteria, pot_usdc, deposit_usdc, window_seconds, max_applications } = req.body || {};
 
     const fail = (message) => res.status(400).json({ error: message });
@@ -289,9 +312,16 @@ if (process.env.DEV_WALLET === '1') {
   console.log('  dev wallet enabled at /dev/wallet.js');
 }
 
-app.listen(PORT, () => {
-  console.log(`slate platform on http://localhost:${PORT}`);
-  console.log('  registry', REGISTRY);
-  console.log('  bridge  ', BRIDGE);
-  console.log('  deployer', deployer.address);
-});
+// Hosted, the platform exports a handler and something else does the listening.
+// Run directly, it listens itself. The same file serves both so there is only
+// one thing to keep correct.
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`slate platform on http://localhost:${PORT}`);
+    console.log('  registry', REGISTRY);
+    console.log('  bridge  ', BRIDGE);
+    console.log('  deployer', deployer.address);
+  });
+}
+
+export default app;

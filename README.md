@@ -10,10 +10,16 @@ together and places each in a tier. The contract turns tiers into amounts, the
 verdict crosses to the chain holding the money, and the winners claim it
 themselves.
 
-* **Registry:** `0xD3C7d3E242b0F5F307507d42952a1d756D0103b3` on GenLayer, chain id 4221
+* **Live app:** https://slate-genlayer-platform.vercel.app
+* **Registry:** `0xD3C7d3E242b0F5F307507d42952a1d756D0103b3` on GenLayer Asimov, chain id 4221
 * **Bridge:** `0x35Ab7f518a2698ce400be9b08D87B72dD3768B21`
 * **Escrow contract:** [`contracts/SlateEscrow.sol`](contracts/SlateEscrow.sol), one deployed per round on Base Sepolia
-* **A completed round:** [escrow on Basescan](https://sepolia.basescan.org/address/0xDeCE2Eb164D11BdCe15e77Fd9973fbB517050940), round `0xD1bd26EA3CB8EE4769d1379Da077DDB797C8FC51`
+* **A round driven through the app:** round `0x20a18d2c8cab15e6247c19d492ae28cb834431d3`, [its escrow on Basescan](https://sepolia.basescan.org/address/0xddaAfe4B79103EAB3AB4CC81326328352A34a1E8)
+
+Anyone can apply, judge and claim on the live app with their own wallet. Opening
+a round is the one action that costs the host gas on two chains, so a hosted
+instance caps it at a few per hour; run your own copy and that limit is yours to
+set.
 
 ## Why it is split across two chains
 
